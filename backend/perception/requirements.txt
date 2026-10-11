@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+openai
+pydantic
+python-multipart
+
+# 说明：视觉/OCR/语音/音频均通过 openai SDK 走 DashScope 兼容接口调用 Qwen 系列模型，
+# 无需本地大模型依赖。以下为可选的离线替代方案（若需本地推理再取消注释）：
+# paddleocr          # 本地 OCR
+# funasr             # 本地语音识别（SenseVoice/Paraformer）
+# tensorflow         # YAMNet 声音事件
+# transformers       # Depth Anything V2 深度估计

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>视碍守护 · 视障人士智能提醒系统</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+
+  <header class="site-header">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">👁️‍🗨️</span>
+      <div>
+        <h1 class="brand-title">视碍守护</h1>
+        <p class="brand-sub">基于视觉 + 听觉的视障人士智能提醒系统</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button id="ttsToggle" class="btn-ghost" aria-pressed="true">语音播报：开</button>
+      <button id="fontToggle" class="btn-ghost" aria-pressed="false">大字号</button>
+    </div>
+  </header>
+
+  <main id="main" class="layout">
+    <!-- 场景选择 -->
+    <section class="panel" aria-labelledby="scenes-title">
+      <h2 id="scenes-title" class="section-title">选择演示场景</h2>
+      <p class="section-hint">点击下方任一卡片，模拟视障人士的典型出行/生活情景，系统将演示从感知到提醒的完整链路。</p>
+      <div id="sceneGrid" class="scene-grid" role="list"></div>
+    </section>
+
+    <!-- 结果展示 -->
+    <section class="panel" aria-labelledby="result-title">
+      <div class="result-head">
+        <h2 id="result-title" class="section-title">感知与提醒</h2>
+        <span id="mockBadge" class="badge" hidden>离线演示</span>
+      </div>
+
+      <div class="result-body">
+        <figure id="previewWrap" class="preview">
+          <img id="previewImg" class="preview-img" alt="场景预览" />
+          <video id="previewVideo" class="preview-video" muted playsinline hidden></video>
+          <figcaption id="previewCaption" class="preview-caption">尚未选择场景</figcaption>
+        </figure>
+
+        <div class="perception">
+          <div class="perception-group">
+            <h3 class="group-title">视觉感知</h3>
+            <p id="sceneDesc" class="desc">—</p>
+            <ul id="hazardList" class="tag-list" aria-label="识别到的障碍"></ul>
+          </div>
+          <div class="perception-group">
+            <h3 class="group-title">听觉感知</h3>
+            <ul id="soundList" class="tag-list" aria-label="识别到的声音事件"></ul>
+          </div>
+        </div>
+      </div>
+
+      <div id="reminderBox" class="reminder" aria-live="polite">
+        <span id="priorityBadge" class="priority">提示</span>
+        <p id="reminderText" class="reminder-text">系统提醒将在这里播报。</p>
+      </div>
+
+      <div class="result-meta">
+        <span id="reasonText" class="meta"></span>
+        <span id="modeText" class="meta"></span>
+      </div>
+    </section>
+
+    <!-- 实时体验 -->
+    <section class="panel" aria-labelledby="live-title">
+      <h2 id="live-title" class="section-title">实时体验（接入后端）</h2>
+      <p class="section-hint">上传一张真实场景图片，可选附带一段音频，系统将调用感知层与决策层，返回实时提醒。</p>
+      <form id="liveForm" class="live-form">
+        <label class="file-field">
+          <span>场景图片（必填）</span>
+          <input type="file" id="imageInput" accept="image/*" required />
+        </label>
+        <label class="file-field">
+          <span>环境音频（可选）</span>
+          <input type="file" id="audioInput" accept="audio/*" />
+        </label>
+        <button type="submit" id="liveSubmit" class="btn-primary">开始分析</button>
+      </form>
+      <p id="liveStatus" class="live-status" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>视碍守护 · 无障碍黑客松项目 —— 让视障人士「看见」世界，听见安全。</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
