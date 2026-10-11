@@ -7,8 +7,8 @@ from config import OCR_MODEL, QWEN_API_KEY, QWEN_BASE_URL
 from schemas import OCRResult
 
 _PROMPT = (
-    "请识别并输出这张图片中所有可见的文字内容，按从上到下、从左到右的顺序逐行输出。"
-    "只输出文字本身，不要添加任何解释、标点以外的内容。若图片中没有文字，输出空字符串。"
+    "请识别这张图片中的所有可见文字，按从上到下、从左到右的顺序逐行输出原始文字。"
+    "要求：只输出文字本身，不要解释、不要编号，重复内容只输出一次；没有文字则输出空。"
 )
 
 
@@ -39,5 +39,6 @@ def _call_ocr(image_bytes: bytes) -> str:
             }
         ],
         temperature=0.1,
+        max_tokens=500,
     )
     return (resp.choices[0].message.content or "").strip()

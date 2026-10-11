@@ -20,6 +20,11 @@ _EVENT_PROMPT = (
     "如果听不到明显声音，输出空数组 []。不要输出任何多余文字。"
 )
 
+_ASR_PROMPT = (
+    "请将这段音频中的语音内容逐字转写为中文文本，只输出转写出的文字，不要添加任何解释。"
+    "如果没有语音，输出空字符串。"
+)
+
 
 def _client():
     from openai import OpenAI
@@ -40,12 +45,22 @@ def transcribe(audio_bytes: bytes) -> TranscribeResult:
 
 
 def _call_asr(audio_bytes: bytes) -> str:
-    resp = _client().audio.transcriptions.create(
+    data_url = "data:audio/wav;base64," + base64.b64encode(audio_bytes).decode()
+    resp = _client().chat.completions.create(
         model=ASR_MODEL,
-        file=("speech.wav", audio_bytes),
-        language="zh",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": _ASR_PROMPT},
+                    {"type": "input_audio", "input_audio": {"data": data_url, "format": "wav"}},
+                ],
+            }
+        ],
+        temperature=0.1,
+        max_tokens=500,
     )
-    return (resp.text or "").strip()
+    return (resp.choices[0].message.content or "").strip()
 
 
 def _detect_intent(text: str) -> str | None:

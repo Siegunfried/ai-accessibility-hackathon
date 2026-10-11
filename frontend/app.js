@@ -79,15 +79,15 @@ const SCENES = [
     thumb: "assets/scenes/04.jpg",
     video: "../demo/videos/04_读药品文字/04_读药品.mp4",
     scene: {
-      description: "手中是一盒药品，说明书文字清晰可见：阿莫西林胶囊。",
-      objects: ["药盒", "说明书", "文字"],
+      description: "手中是一瓶关节保健药品，瓶身标签文字清晰可见。",
+      objects: ["药瓶", "标签", "文字"],
       hazards: [],
       danger: "low",
     },
     events: [],
     intent: "read_text",
     reminder: {
-      speak: "已识别药品：阿莫西林胶囊，口服，一次一粒，一日三次，餐后服用。",
+      speak: "已读取药品文字：Move Free，关节健康，每日三片，36 片装。",
       priority: "normal",
       mode: "voice",
       reason: "OCR 读取药品文字",
@@ -217,6 +217,79 @@ function showPreview(scene) {
   previewVideo.play().catch(() => {});
 }
 
+// ===== 读药品：真实 OCR 链路（从视频抽帧 → 感知层识别药品文字）=====
+function ensureVideoReady(video) {
+  return new Promise((resolve) => {
+    if (video.readyState >= 2 && video.videoWidth) return resolve();
+    const onReady = () => {
+      video.removeEventListener("loadeddata", onReady);
+      resolve();
+    };
+    video.addEventListener("loadeddata", onReady);
+  });
+}
+
+function extractFrameJpeg(video, timeSec) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      await ensureVideoReady(video);
+    } catch (_) {}
+    const onSeeked = () => {
+      video.removeEventListener("seeked", onSeeked);
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth || 1280;
+        canvas.height = video.videoHeight || 720;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("抽帧失败"))), "image/jpeg", 0.9);
+      } catch (e) {
+        reject(e);
+      }
+    };
+    video.addEventListener("seeked", onSeeked);
+    video.currentTime = timeSec;
+  });
+}
+
+async function ocrReadFrame(video, timeSec) {
+  const blob = await extractFrameJpeg(video, timeSec);
+  const fd = new FormData();
+  fd.append("image", blob, "frame.jpg");
+  const resp = await fetch(`${PERCEPTION_URL}/api/ocr/read`, { method: "POST", body: fd });
+  if (!resp.ok) throw new Error(`感知层返回 ${resp.status}`);
+  return resp.json(); // { text, mock }
+}
+
+async function showMedicineOCR(scene) {
+  // 先展示脚本兜底，便于离线也能看
+  showResult(scene.scene, scene.events, scene.reminder, { mock: true, scripted: true });
+
+  try {
+    reminderText.textContent = "正在识别药品文字…";
+    const result = await ocrReadFrame(previewVideo, 14); // 14s 处为最清晰的药名标签帧
+    const text = (result && result.text) ? String(result.text).trim() : "";
+    if (text) {
+      sceneDesc.textContent = "药品标签上识别到的文字（实时 OCR）：";
+      renderTags(hazardList, [], "hazard");
+      renderTags(soundList, [], "sound");
+      reminderBox.className = "reminder normal";
+      priorityBadge.textContent = "提示";
+      reminderText.textContent = text.replace(/\s+/g, " ").trim();
+      reasonText.textContent = "判断依据：OCR 实时读取药品包装文字";
+      modeText.textContent = "提醒方式：语音";
+      mockBadge.textContent = "离线降级(mock)";
+      mockBadge.hidden = !(result && result.mock);
+      speak("药品文字：" + text.replace(/\s+/g, "，"));
+    }
+  } catch (e) {
+    // OCR 失败则保持脚本演示兜底
+    reminderText.textContent = scene.reminder.speak;
+    mockBadge.textContent = "脚本演示";
+    mockBadge.hidden = false;
+  }
+}
+
 // ===== 场景卡片 =====
 function renderScenes() {
   SCENES.forEach((scene) => {
@@ -230,7 +303,11 @@ function renderScenes() {
       document.querySelectorAll(".scene-card").forEach((c) => c.setAttribute("aria-selected", "false"));
       card.setAttribute("aria-selected", "true");
       showPreview(scene);
-      showResult(scene.scene, scene.events, scene.reminder, { mock: true, scripted: true });
+      if (scene.id === "04") {
+        showMedicineOCR(scene);
+      } else {
+        showResult(scene.scene, scene.events, scene.reminder, { mock: true, scripted: true });
+      }
     });
 
     sceneGrid.appendChild(card);
