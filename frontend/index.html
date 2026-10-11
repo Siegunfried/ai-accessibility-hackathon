@@ -55,6 +55,10 @@
             <h3 class="group-title">听觉感知</h3>
             <ul id="soundList" class="tag-list" aria-label="识别到的声音事件"></ul>
           </div>
+          <div class="perception-group">
+            <h3 class="group-title">药品识别</h3>
+            <ul id="medicineList" class="tag-list" aria-label="识别到的药品"></ul>
+          </div>
         </div>
       </div>
 
@@ -67,24 +71,6 @@
         <span id="reasonText" class="meta"></span>
         <span id="modeText" class="meta"></span>
       </div>
-    </section>
-
-    <!-- 实时体验 -->
-    <section class="panel" aria-labelledby="live-title">
-      <h2 id="live-title" class="section-title">实时体验（接入后端）</h2>
-      <p class="section-hint">上传一张真实场景图片，可选附带一段音频，系统将调用感知层与决策层，返回实时提醒。</p>
-      <form id="liveForm" class="live-form">
-        <label class="file-field">
-          <span>场景图片（必填）</span>
-          <input type="file" id="imageInput" accept="image/*" required />
-        </label>
-        <label class="file-field">
-          <span>环境音频（可选）</span>
-          <input type="file" id="audioInput" accept="audio/*" />
-        </label>
-        <button type="submit" id="liveSubmit" class="btn-primary">开始分析</button>
-      </form>
-      <p id="liveStatus" class="live-status" role="status" aria-live="polite"></p>
     </section>
   </main>
 

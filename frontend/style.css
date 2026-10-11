@@ -166,6 +166,7 @@ body.large-text { font-size: 20px; }
 }
 .tag.hazard { border-color: var(--danger); color: var(--danger); }
 .tag.sound { border-color: var(--accent); color: var(--accent); }
+.tag.medicine { border-color: var(--brand); color: var(--brand); }
 
 /* 提醒卡片 */
 .reminder {

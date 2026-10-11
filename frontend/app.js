@@ -1,13 +1,6 @@
-/* 视碍守护 —— 前端演示逻辑
- * 数据流：场景(图片/视频 + 音频) → 感知层(视觉/听觉) → 决策层(融合) → 提醒(TTS播报)
- * 脚本演示模式：内置 6 个典型场景的预置感知结果，保证离线也可完整演示。
- * 实时模式：真实调用后端 2 决策层 /api/decide（可选后端 1 感知层）。
- */
+/* 视碍守护 —— 前端演示逻辑（纯静态演示，不依赖后端，保证显示稳定） */
 
-const DECISION_URL = "http://localhost:8001";   // 后端 2 决策层
-const PERCEPTION_URL = "http://localhost:8000"; // 后端 1 感知层
-
-// ===== 六个演示场景（与 demo/videos 一一对应）=====
+// ===== 五个演示场景（与 demo/videos 一一对应）=====
 const SCENES = [
   {
     id: "01",
@@ -53,8 +46,8 @@ const SCENES = [
     id: "03",
     name: "盲道障碍",
     short: "盲道被共享单车占用",
-    thumb: "assets/scenes/03.jpg",
-    video: "../demo/videos/03_盲道障碍/03_盲道被堵.mp4",
+    thumb: "assets/scenes/06.jpg",
+    video: "../demo/videos/06_语音问路/06_语音问路.mp4",
     scene: {
       description: "你正沿盲道行走，正前方盲道上横着一辆共享单车，旁边还有一个锥形路障。",
       objects: ["共享单车", "锥形路障", "盲道"],
@@ -79,46 +72,25 @@ const SCENES = [
     thumb: "assets/scenes/04.jpg",
     video: "../demo/videos/04_读药品文字/04_读药品.mp4",
     scene: {
-      description: "手中是一瓶关节保健药品，瓶身标签文字清晰可见。",
-      objects: ["药瓶", "标签", "文字"],
+      description: "手中是几盒药品，系统将逐一读取药名。",
+      objects: ["药盒", "标签", "文字"],
       hazards: [],
       danger: "low",
     },
     events: [],
-    intent: "read_text",
     reminder: {
-      speak: "已读取药品文字：Move Free，关节健康，每日三片，36 片装。",
+      speak: "已识别 6 种药品。",
       priority: "normal",
       mode: "voice",
-      reason: "OCR 读取药品文字",
-    },
-  },
-  {
-    id: "05",
-    name: "过马路来车",
-    short: "过马路时右侧有来车",
-    thumb: "assets/scenes/05.jpg",
-    video: "../demo/videos/05_过马路来车/05_过马路.mp4",
-    scene: {
-      description: "你正站在斑马线前准备过马路，右侧有车辆驶来，信号灯显示红灯。",
-      objects: ["斑马线", "车辆", "红绿灯"],
-      hazards: [{ label: "来车", distance: "约8米", direction: "右侧" }],
-      danger: "high",
-    },
-    events: [{ label: "汽车鸣笛", conf: 0.95 }, { label: "引擎声", conf: 0.85 }],
-    reminder: {
-      speak: "右侧有来车，请立即止步等待，车辆通过、绿灯后再过马路。",
-      priority: "high",
-      mode: "both",
-      reason: "视觉车辆 + 听觉鸣笛双重高危",
+      reason: "药品文字识别",
     },
   },
   {
     id: "06",
     name: "语音问路",
     short: "语音询问当前位置与路线",
-    thumb: "assets/scenes/06.jpg",
-    video: "../demo/videos/06_语音问路/06_语音问路.mp4",
+    thumb: "assets/scenes/03.jpg",
+    video: "../demo/videos/03_盲道障碍/03_盲道被堵.mp4",
     scene: {
       description: "你正站在一条商业街路口，正前方约五十米是地铁站入口。",
       objects: ["商业街", "路口", "地铁站入口"],
@@ -126,7 +98,6 @@ const SCENES = [
       danger: "low",
     },
     events: [{ label: "环境人声", conf: 0.6 }],
-    intent: "ask_scene",
     reminder: {
       speak: "您正位于商业街路口，前方约五十米是地铁三号线入口，请沿盲道直行。",
       priority: "normal",
@@ -134,6 +105,16 @@ const SCENES = [
       reason: "用户主动询问场景",
     },
   },
+];
+
+// 读药品场景：6 个药品名称（写死，不依赖后端 OCR）
+const MEDICINES = [
+  "迪康 通窍鼻炎颗粒",
+  "999 感冒清热颗粒",
+  "Move Free 关节健康",
+  "万宁 OMEGA-3 深海鱼油",
+  "昆中药 参苓健脾胃颗粒",
+  "诺特兰德 肌酸粉",
 ];
 
 const PRIORITY_TEXT = { high: "高危", normal: "提示", low: "普通" };
@@ -153,7 +134,7 @@ const priorityBadge = $("#priorityBadge");
 const reminderText = $("#reminderText");
 const reasonText = $("#reasonText");
 const modeText = $("#modeText");
-const mockBadge = $("#mockBadge");
+const medicineList = $("#medicineList");
 
 let ttsEnabled = true;
 
@@ -181,7 +162,7 @@ function renderTags(container, items, cls) {
 }
 
 // ===== 展示完整结果 =====
-function showResult(scene, events, reminder, opts = {}) {
+function showResult(scene, events, reminder) {
   sceneDesc.textContent = scene.description || "未识别到有效场景";
   renderTags(hazardList, scene.hazards || [], "hazard");
   renderTags(soundList, events || [], "sound");
@@ -191,13 +172,6 @@ function showResult(scene, events, reminder, opts = {}) {
   reminderText.textContent = reminder.speak || "系统提醒将在这里播报。";
   reasonText.textContent = "判断依据：" + (reminder.reason || "—");
   modeText.textContent = "提醒方式：" + (MODE_TEXT[reminder.mode] || "语音");
-
-  if (opts.mock) {
-    mockBadge.textContent = opts.scripted ? "脚本演示" : "离线降级(mock)";
-    mockBadge.hidden = false;
-  } else {
-    mockBadge.hidden = true;
-  }
 
   speak(reminder.speak);
 }
@@ -217,77 +191,25 @@ function showPreview(scene) {
   previewVideo.play().catch(() => {});
 }
 
-// ===== 读药品：真实 OCR 链路（从视频抽帧 → 感知层识别药品文字）=====
-function ensureVideoReady(video) {
-  return new Promise((resolve) => {
-    if (video.readyState >= 2 && video.videoWidth) return resolve();
-    const onReady = () => {
-      video.removeEventListener("loadeddata", onReady);
-      resolve();
-    };
-    video.addEventListener("loadeddata", onReady);
-  });
+function addMedicineTag(name) {
+  const li = document.createElement("li");
+  li.className = "tag medicine";
+  li.textContent = name;
+  medicineList.appendChild(li);
 }
 
-function extractFrameJpeg(video, timeSec) {
-  return new Promise(async (resolve, reject) => {
-    try {
-      await ensureVideoReady(video);
-    } catch (_) {}
-    const onSeeked = () => {
-      video.removeEventListener("seeked", onSeeked);
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = video.videoWidth || 1280;
-        canvas.height = video.videoHeight || 720;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("抽帧失败"))), "image/jpeg", 0.9);
-      } catch (e) {
-        reject(e);
-      }
-    };
-    video.addEventListener("seeked", onSeeked);
-    video.currentTime = timeSec;
-  });
-}
-
-async function ocrReadFrame(video, timeSec) {
-  const blob = await extractFrameJpeg(video, timeSec);
-  const fd = new FormData();
-  fd.append("image", blob, "frame.jpg");
-  const resp = await fetch(`${PERCEPTION_URL}/api/ocr/read`, { method: "POST", body: fd });
-  if (!resp.ok) throw new Error(`感知层返回 ${resp.status}`);
-  return resp.json(); // { text, mock }
-}
-
-async function showMedicineOCR(scene) {
-  // 先展示脚本兜底，便于离线也能看
-  showResult(scene.scene, scene.events, scene.reminder, { mock: true, scripted: true });
-
-  try {
-    reminderText.textContent = "正在识别药品文字…";
-    const result = await ocrReadFrame(previewVideo, 14); // 14s 处为最清晰的药名标签帧
-    const text = (result && result.text) ? String(result.text).trim() : "";
-    if (text) {
-      sceneDesc.textContent = "药品标签上识别到的文字（实时 OCR）：";
-      renderTags(hazardList, [], "hazard");
-      renderTags(soundList, [], "sound");
-      reminderBox.className = "reminder normal";
-      priorityBadge.textContent = "提示";
-      reminderText.textContent = text.replace(/\s+/g, " ").trim();
-      reasonText.textContent = "判断依据：OCR 实时读取药品包装文字";
-      modeText.textContent = "提醒方式：语音";
-      mockBadge.textContent = "离线降级(mock)";
-      mockBadge.hidden = !(result && result.mock);
-      speak("药品文字：" + text.replace(/\s+/g, "，"));
-    }
-  } catch (e) {
-    // OCR 失败则保持脚本演示兜底
-    reminderText.textContent = scene.reminder.speak;
-    mockBadge.textContent = "脚本演示";
-    mockBadge.hidden = false;
-  }
+// ===== 读药品：写死的 6 个药品名称 =====
+function showMedicine(scene) {
+  showResult(scene.scene, scene.events, scene.reminder);
+  medicineList.replaceChildren();
+  renderTags(hazardList, [], "hazard");
+  renderTags(soundList, [], "sound");
+  sceneDesc.textContent = "识别到以下 6 种药品：";
+  MEDICINES.forEach((name) => addMedicineTag(name));
+  reminderText.textContent = "已识别 6 种药品。";
+  reasonText.textContent = "判断依据：药品文字识别（内置结果）";
+  modeText.textContent = "提醒方式：语音";
+  speak("已识别以下药品：" + MEDICINES.join("，"));
 }
 
 // ===== 场景卡片 =====
@@ -304,66 +226,15 @@ function renderScenes() {
       card.setAttribute("aria-selected", "true");
       showPreview(scene);
       if (scene.id === "04") {
-        showMedicineOCR(scene);
+        showMedicine(scene);
       } else {
-        showResult(scene.scene, scene.events, scene.reminder, { mock: true, scripted: true });
+        medicineList.replaceChildren();
+        showResult(scene.scene, scene.events, scene.reminder);
       }
     });
 
     sceneGrid.appendChild(card);
   });
-}
-
-// ===== 实时模式：调用后端 =====
-async function liveAnalyze(imageFile, audioFile) {
-  const status = $("#liveStatus");
-  status.className = "live-status";
-  status.textContent = "正在分析…";
-
-  // 1) 调用后端 2 决策层得到最终提醒
-  const fd = new FormData();
-  fd.append("image", imageFile);
-  if (audioFile) fd.append("audio", audioFile);
-
-  let reminder;
-  try {
-    const resp = await fetch(`${DECISION_URL}/api/decide`, { method: "POST", body: fd });
-    if (!resp.ok) throw new Error(`决策层返回 ${resp.status}`);
-    reminder = await resp.json();
-  } catch (e) {
-    status.className = "live-status err";
-    status.textContent = "后端未启动：请先运行决策层服务（见 README），端口 " + DECISION_URL + "。错误：" + e.message;
-    return;
-  }
-
-  // 2) 尽力调用后端 1 感知层，展示视觉细节
-  let scene = null;
-  try {
-    const sfd = new FormData();
-    sfd.append("image", imageFile);
-    const sresp = await fetch(`${PERCEPTION_URL}/api/vision/analyze`, { method: "POST", body: sfd });
-    if (sresp.ok) scene = await sresp.json();
-  } catch (_) { /* 感知层未启动则忽略 */ }
-
-  const events = [];
-  const opts = { mock: !!reminder.mock };
-
-  previewImg.style.display = "block";
-  previewVideo.hidden = true;
-  previewImg.src = URL.createObjectURL(imageFile);
-  previewCaption.textContent = "实时上传图片";
-
-  showResult(
-    scene || { description: reminder.reason || "—", objects: [], hazards: [], danger: reminder.priority || "low" },
-    events,
-    reminder,
-    opts
-  );
-
-  status.className = "live-status ok";
-  status.textContent = reminder.mock
-    ? "已返回提醒（当前为离线降级 mock 结果，配置 API Key 后接入真实模型）。"
-    : "已返回实时提醒。";
 }
 
 // ===== 事件绑定 =====
@@ -378,14 +249,6 @@ function bindEvents() {
   $("#fontToggle").addEventListener("click", (e) => {
     const on = document.body.classList.toggle("large-text");
     e.target.setAttribute("aria-pressed", String(on));
-  });
-
-  $("#liveForm").addEventListener("submit", (e) => {
-    e.preventDefault();
-    const img = $("#imageInput").files[0];
-    const aud = $("#audioInput").files[0] || null;
-    if (!img) return;
-    liveAnalyze(img, aud);
   });
 }
 
